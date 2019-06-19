@@ -22,7 +22,7 @@
     "url": "https://github.com/krausest/js-framework-benchmark.git"
   },
   "devDependencies": {
-    "rollup": "1.11.3",
-    "rollup-plugin-terser": "4.0.4"
+    "rollup": "1.15.6",
+    "rollup-plugin-terser": "5.0.0"
   }
 }

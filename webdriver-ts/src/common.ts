@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import axios from 'axios';
 
 export interface JSONResult {
     framework: string, keyed: boolean, benchmark: string, type: string, min: number,
@@ -49,8 +50,10 @@ export let config = {
     EXIT_ON_ERROR: false,
     STARTUP_DURATION_FROM_EVENTLOG: true,
     STARTUP_SLEEP_DURATION: 1000,
-    FORK_CHROMEDRIVER: true
+    FORK_CHROMEDRIVER: true,
+    WRITE_RESULTS: true
 }
+export type TConfig = typeof config;
 
 export interface FrameworkData {
     name: string;
@@ -195,12 +198,12 @@ export class PackageVersionInformationResult {
     }
 }
 
-export function determineInstalledVersions(framework: FrameworkVersionInformationDynamic): PackageVersionInformationResult {
-    let frameworksPath = path.resolve('..','frameworks');
-    let packageLockJSONPath = path.resolve(frameworksPath, framework.keyedType, framework.directory, 'package-lock.json');
+export async function determineInstalledVersions(framework: FrameworkVersionInformationDynamic): Promise<PackageVersionInformationResult> {
+
     let versions = new PackageVersionInformationResult(framework);
-    if (fs.existsSync(packageLockJSONPath)) {
-        let packageLock = JSON.parse(fs.readFileSync(packageLockJSONPath, 'utf8'));
+    try {
+        console.log(`http://localhost:${config.PORT}/frameworks/${framework.keyedType}/${framework.directory}/package-lock.json`)
+        let packageLock: any = (await axios.get(`http://localhost:${config.PORT}/frameworks/${framework.keyedType}/${framework.directory}/package-lock.json`)).data;
         for (let packageName of framework.packageNames) {
             if (packageLock.dependencies[packageName]) {
                 versions.add(new PackageVersionInformationValid(packageName, packageLock.dependencies[packageName].version));
@@ -208,25 +211,35 @@ export function determineInstalledVersions(framework: FrameworkVersionInformatio
                 versions.add(new PackageVersionInformationErrorUnknownPackage(packageName));
             }
         }
-    } else {
-        versions.add(new PackageVersionInformationErrorNoPackageJSONLock());
+    } catch (err) {
+        if (err.errno==='ECONNREFUSED') {
+            console.log("Can't load package-lock.json via http. Make sure the http-server is running on port 8080");
+            throw "Can't load package-lock.json via http. Make sure the http-server is running on port 8080";
+        } else if (err.response && err.response.status === 404) {
+            console.log(`package-lock.json not found for ${framework.keyedType}/${framework.directory}`);
+            versions.add(new PackageVersionInformationErrorNoPackageJSONLock());
+        } else {
+            console.log("err", err);
+            versions.add(new PackageVersionInformationErrorNoPackageJSONLock());
+        }
     }
     return versions;
 }
 
-export function initializeFrameworks(matchPredicate: IMatchPredicate = matchAll): FrameworkData[] {
+export async function initializeFrameworks(matchPredicate: IMatchPredicate = matchAll): Promise<FrameworkData[]> {
     let frameworkVersionInformations = loadFrameworkVersionInformation(matchPredicate);
 
-    let frameworks = frameworkVersionInformations.map(frameworkVersionInformation => {
+    let frameworks: FrameworkData[] = [];
+    for (let frameworkVersionInformation of frameworkVersionInformations) {
         if (frameworkVersionInformation instanceof FrameworkVersionInformationDynamic) {
-            return determineInstalledVersions(frameworkVersionInformation).getFrameworkData();
+            frameworks.push((await determineInstalledVersions(frameworkVersionInformation)).getFrameworkData());
         } else if (frameworkVersionInformation instanceof FrameworkVersionInformationStatic) {
-            return frameworkVersionInformation.getFrameworkData();
+            frameworks.push(frameworkVersionInformation.getFrameworkData());
         } else {
             console.log(`WARNING: Ignoring package ${frameworkVersionInformation.keyedType}/${frameworkVersionInformation.directory}: ${frameworkVersionInformation.error}`)
-            return null;
+            frameworks.push(null);
         }
-    });
+    }
 
     frameworks = frameworks.filter(f => f!==null);
     if (config.LOG_DETAILS) {

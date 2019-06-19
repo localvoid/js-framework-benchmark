@@ -5,7 +5,6 @@ const webdriverAccess_1 = require("./webdriverAccess");
 const common_1 = require("./common");
 // necessary to launch without specifiying a path
 var chromedriver = require('chromedriver');
-let frameworks = common_1.initializeFrameworks();
 let init = `
 window.nonKeyedDetector_reset = function() {
     window.nonKeyedDetector_tradded = 0;
@@ -84,7 +83,7 @@ function isKeyedRemove(result) {
 function isKeyedSwapRow(result) {
     return (result.tradded > 0 && result.trremoved > 0);
 }
-async function runBench(frameworkNames) {
+async function runBench(frameworks, frameworkNames) {
     let runFrameworks = frameworks.filter(f => frameworkNames.some(name => f.fullNameWithKeyedAndVersion.indexOf(name) > -1));
     console.log("Frameworks that will be checked", runFrameworks.map(f => f.fullNameWithKeyedAndVersion).join(' '));
     let frameworkMap = new Map();
@@ -165,10 +164,14 @@ let benchmarkOptions = {
     numIterationsForMemBenchmarks: common_1.config.REPEAT_RUN_MEM,
     numIterationsForStartupBenchmark: common_1.config.REPEAT_RUN_STARTUP
 };
-if (args.help) {
-    yargs.showHelp();
+async function main() {
+    let frameworks = await common_1.initializeFrameworks();
+    if (args.help) {
+        yargs.showHelp();
+    }
+    else {
+        runBench(frameworks, runFrameworks);
+    }
 }
-else {
-    runBench(runFrameworks);
-}
+main();
 //# sourceMappingURL=isKeyed.js.map

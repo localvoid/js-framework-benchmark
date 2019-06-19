@@ -23,10 +23,9 @@ function buildData(count) {
 const Button = ({ id, text, fn }) => <div class='col-sm-6 smallpad'><button id={id} class='btn btn-primary btn-block' type='button' onClick={fn}>{text}</button></div>;
 const RemoveIcon = ({ preload }) => <span class={(preload ? 'preloadicon glyphicon glyphicon-remove' : 'glyphicon glyphicon-remove')} aria-hidden="true"></span>;
 const Cell = ({ className, children }) => <td class={(className)}>{children}</td>;
-// Solid library is broken, unable to wrap first <td> in a Cell component
 const Row = ({ state, row, select, remove }) => (
   <tr class={(state.selected === row.id ? 'danger' : '')}>
-    <td class="col-md-1">{(row.id)}</td>
+    <Cell className='col-md-1'>{(row.id)}</Cell>
     <Cell className='col-md-4'><a onClick={() => { select(row.id); }}>{(row.label)}</a></Cell>
     <Cell className='col-md-1'><a onClick={() => { remove(row.id); }}><RemoveIcon preload={false} /></a></Cell>
     <Cell className='col-md-6'></Cell>

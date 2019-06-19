@@ -6,7 +6,7 @@ import { JSONResult, config, FrameworkData, initializeFrameworks, BenchmarkError
 
 var exec = require('child_process').execSync;
 
-
+async function main() {
 let frameworks = process.argv.length<=2 ? [] : process.argv.slice(2,process.argv.length);
 
 if (frameworks.length === 0) {
@@ -35,21 +35,24 @@ if (frameworks.length === 0) {
         stdio: 'inherit'
     });
 
-    let frameworkInfos = initializeFrameworks((filePath: string) => frameworks.indexOf(filePath) > -1);
+    let frameworkInfos = await initializeFrameworks((filePath: string) => frameworks.indexOf(filePath) > -1);
     // console.log("frameworkInfos", frameworkInfos, frameworks);
     let frameworkNames = frameworkInfos.map(f => "'"+f.fullNameWithKeyedAndVersion+"'").join(' ');
     if (frameworkInfos.length === 0) {
         throw "expected to find some version information for the framework";
     }
-    console.log('npm run bench -- --count 1 --framework '+frameworkNames);
-    exec('npm run bench -- --count 1 --framework '+frameworkNames, {
+    console.log('npm run bench -- --headless --noResults --count 1 --framework '+frameworkNames);
+    exec('npm run bench -- --headless --noResults --count 1 --framework '+frameworkNames, {
         stdio: 'inherit'
     });
-    console.log('npm run isKeyed -- --framework '+frameworkNames);
-    exec('npm run isKeyed -- --framework '+frameworkNames, {
+    console.log('npm run isKeyed -- --headless --framework '+frameworkNames);
+    exec('npm run isKeyed -- --headless --framework '+frameworkNames, {
         stdio: 'inherit'
     });
 
     console.log("All checks are fine!");
     console.log("======> Please rerun the benchmark: npm run bench -- --framework ", frameworkNames);
 }
+}
+
+main();

@@ -194,41 +194,46 @@ async function shadowRoot(driver) {
     return useShadowRoot ? await driver.executeScript('return document.querySelector("main-element").shadowRoot')
         : await driver.findElement(selenium_webdriver_1.By.tagName("body"));
 }
+// node_modules\.bin\chromedriver.cmd --verbose --port=9998 --log-path=chromedriver.log
+// SELENIUM_REMOTE_URL=http://localhost:9998
 function buildDriver(benchmarkOptions) {
-    let logPref = new selenium_webdriver_1.logging.Preferences();
-    logPref.setLevel(selenium_webdriver_1.logging.Type.PERFORMANCE, selenium_webdriver_1.logging.Level.ALL);
-    logPref.setLevel(selenium_webdriver_1.logging.Type.BROWSER, selenium_webdriver_1.logging.Level.ALL);
-    let options = new chrome.Options();
-    if (benchmarkOptions.headless) {
-        options = options.addArguments("--headless");
-        options = options.addArguments("--disable-gpu"); // https://bugs.chromium.org/p/chromium/issues/detail?id=737678
-    }
-    options = options.addArguments("--js-flags=--expose-gc");
-    options = options.addArguments("--enable-precise-memory-info");
-    options = options.addArguments("--no-sandbox");
-    options = options.addArguments("--no-first-run");
-    options = options.addArguments("--enable-automation");
-    options = options.addArguments("--disable-infobars");
-    options = options.addArguments("--disable-background-networking");
-    options = options.addArguments("--disable-background-timer-throttling");
-    options = options.addArguments("--disable-cache");
-    options = options.addArguments("--disable-translate");
-    options = options.addArguments("--disable-sync");
-    options = options.addArguments("--disable-extensions");
-    options = options.addArguments("--disable-default-apps");
-    options = options.addArguments("--remote-debugging-port=" + (benchmarkOptions.remoteDebuggingPort).toFixed());
-    options = options.addArguments("--window-size=1200,800");
-    if (benchmarkOptions.chromeBinaryPath)
-        options = options.setChromeBinaryPath(benchmarkOptions.chromeBinaryPath);
-    options = options.setLoggingPrefs(logPref);
-    options = options.setPerfLoggingPrefs({
-        enableNetwork: true, enablePage: true,
-        traceCategories: 'devtools.timeline,blink.user_timing'
+    console.time("chromedriver");
+    let caps = new selenium_webdriver_1.Capabilities({
+        browserName: 'chrome',
+        platform: 'ANY',
+        version: 'stable',
+        "goog:chromeOptions": {
+            args: [
+                "--user-data-dir=/home/void/chrome/benchmark",
+                "--js-flags=--expose-gc",
+                "--enable-precise-memory-info",
+                "--no-first-run",
+                "--enable-automation",
+                "--disable-infobars",
+                "--disable-background-networking",
+                "--disable-background-timer-throttling",
+                "--disable-cache",
+                "--disable-translate",
+                "--disable-sync",
+                "--disable-extensions",
+                "--disable-default-apps",
+                "--remote-debugging-port=" + (benchmarkOptions.remoteDebuggingPort).toFixed(),
+                "--window-size=1200,800"
+            ],
+            "perfLoggingPrefs": {
+                "enableNetwork": true,
+                "enablePage": true,
+                "traceCategories": "devtools.timeline,blink.user_timing"
+            }
+        },
+        "goog:loggingPrefs": {
+            "browser": "ALL",
+            "performance": "ALL"
+        }
     });
-    // Do the following lines really cause https://github.com/krausest/js-framework-benchmark/issues/303 ?
-    // return chrome.Driver.createSession(options, service);
+    // port probing fails sometimes on windows, the following driver construction avoids probing:
     let service = new chrome.ServiceBuilder().setPort(benchmarkOptions.chromePort).build();
-    var driver = chrome.Driver.createSession(options, service);
+    var driver = chrome.Driver.createSession(caps, service);
     return driver;
 }
 exports.buildDriver = buildDriver;

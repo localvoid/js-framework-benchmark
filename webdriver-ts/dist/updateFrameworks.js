@@ -14,7 +14,7 @@ let args = yargs(process.argv)
 let updatePackages = args.update;
 console.log("ARGS", args._.slice(2, args._.length));
 let directories = args._.slice(2, args._.length);
-let checkDirectory = (keyedType, folderName) => directories.length === 0 || args._.includes(path.join(keyedType, folderName));
+let checkDirectory = (keyedType, folderName) => directories.length === 0 || args._.some(a => path.join(keyedType, folderName).startsWith(a));
 async function ncuReportsUpdatedVersion(packageVersionInfo) {
     let ncuInfo = await ncu.run({
         packageFile: path.resolve('..', 'frameworks', packageVersionInfo.framework.keyedType, packageVersionInfo.framework.directory, 'package.json'),
@@ -23,7 +23,7 @@ async function ncuReportsUpdatedVersion(packageVersionInfo) {
         loglevel: 'silent'
     });
     if (ncuInfo) {
-        console.log(ncuInfo);
+        // console.log(ncuInfo);
         return packageVersionInfo.versions.filter((pi) => ncuInfo[pi.packageName])
             .some((pi) => {
             let newVersion = ncuInfo[pi.packageName];
@@ -65,7 +65,7 @@ async function main() {
     let automatically = frameworkVersionInformations
         .filter(frameworkVersionInformation => frameworkVersionInformation instanceof common_1.FrameworkVersionInformationDynamic)
         .map(frameworkVersionInformation => frameworkVersionInformation);
-    let packageLockInformations = automatically.map(frameworkVersionInformation => common_1.determineInstalledVersions(frameworkVersionInformation));
+    let packageLockInformations = await Promise.all(automatically.map(frameworkVersionInformation => common_1.determineInstalledVersions(frameworkVersionInformation)));
     let noPackageLock = packageLockInformations.filter(pli => pli.versions.some((packageVersionInfo) => packageVersionInfo instanceof common_1.PackageVersionInformationErrorNoPackageJSONLock));
     if (noPackageLock.length > 0) {
         console.log("WARNING: The following frameworks do not yet have a package-lock.json file (maybe you must 'npm install' it): ");
@@ -76,12 +76,12 @@ async function main() {
         console.log("WARNING: The following frameworks do not have a version for the specified packages in package-lock.json file (maybe you misspelled the package name): ");
         let unknownPackagesStr = (packageVersionInfo) => packageVersionInfo.versions.filter(pvi => pvi instanceof common_1.PackageVersionInformationErrorUnknownPackage).
             map((packageVersionInfo) => packageVersionInfo.packageName).join(', ');
-        console.log(unknownPackages.map(val => val.framework.keyedType + '/' + val.framework.directory + ' for package ' + unknownPackagesStr(val)).join('\n') + '\n');
+        // console.log(unknownPackages.map(val => val.framework.keyedType +'/' + val.framework.directory + ' for package ' + unknownPackagesStr(val)).join('\n') + '\n');
     }
     let checkVersionsFor = packageLockInformations
         .filter(pli => pli.versions.every((packageVersionInfo) => packageVersionInfo instanceof common_1.PackageVersionInformationValid))
         .filter(f => checkDirectory(f.framework.keyedType, f.framework.directory));
-    console.log("checkVersionsFor", checkVersionsFor);
+    console.log("checkVersionsFor", checkVersionsFor.map(v => v.getFrameworkData().uri));
     let toBeUpdated = new Array();
     for (let f of checkVersionsFor) {
         if (await ncuReportsUpdatedVersion(f))

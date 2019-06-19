@@ -6,14 +6,13 @@ const yargs = require("yargs");
 const common_1 = require("./common");
 const child_process_1 = require("child_process");
 const forkedBenchmarkRunner_1 = require("./forkedBenchmarkRunner");
-let frameworks = common_1.initializeFrameworks();
-function forkedRun(frameworkName, keyed, benchmarkName, benchmarkOptions) {
+function forkedRun(frameworks, frameworkName, keyed, benchmarkName, benchmarkOptions) {
     if (common_1.config.FORK_CHROMEDRIVER) {
         return new Promise(function (resolve, reject) {
             const forked = child_process_1.fork('dist/forkedBenchmarkRunner.js');
             if (common_1.config.LOG_DEBUG)
                 console.log("forked child process");
-            forked.send({ frameworks, keyed, frameworkName, benchmarkName, benchmarkOptions });
+            forked.send({ config: common_1.config, frameworks, keyed, frameworkName, benchmarkName, benchmarkOptions });
             forked.on('message', (msg) => {
                 if (common_1.config.LOG_DEBUG)
                     console.log("main process got message from child", msg);
@@ -25,7 +24,7 @@ function forkedRun(frameworkName, keyed, benchmarkName, benchmarkOptions) {
         return forkedBenchmarkRunner_1.executeBenchmark(frameworks, keyed, frameworkName, benchmarkName, benchmarkOptions);
     }
 }
-async function runBench(frameworkNames, benchmarkNames, dir) {
+async function runBench(frameworks, frameworkNames, benchmarkNames, dir) {
     let errors = [];
     let warnings = [];
     let runFrameworks = frameworks.filter(f => frameworkNames.some(name => f.fullNameWithKeyedAndVersion.indexOf(name) > -1));
@@ -58,7 +57,7 @@ async function runBench(frameworkNames, benchmarkNames, dir) {
             numIterationsForStartupBenchmark: common_1.config.REPEAT_RUN_STARTUP
         };
         try {
-            let errorsAndWarnings = await forkedRun(framework.name, framework.keyed, benchmark.id, benchmarkOptions);
+            let errorsAndWarnings = await forkedRun(frameworks, framework.name, framework.keyed, benchmark.id, benchmarkOptions);
             errors.splice(errors.length, 0, ...errorsAndWarnings.errors);
             warnings.splice(warnings.length, 0, ...errorsAndWarnings.warnings);
         }
@@ -91,6 +90,7 @@ let args = yargs(process.argv)
     .help('help')
     .default('check', 'false')
     .default('fork', 'true')
+    .boolean('noResults')
     .default('exitOnError', 'false')
     .default('count', Number.MAX_SAFE_INTEGER)
     .default('port', common_1.config.PORT)
@@ -98,30 +98,35 @@ let args = yargs(process.argv)
     .string('chromeDriver')
     .boolean('headless')
     .array("framework").array("benchmark").argv;
-console.log(args);
-let runBenchmarks = (args.benchmark && args.benchmark.length > 0 ? args.benchmark : [""]).map(v => v.toString());
-let runFrameworks = (args.framework && args.framework.length > 0 ? args.framework : [""]).map(v => v.toString());
-let count = Number(args.count);
-common_1.config.PORT = Number(args.port);
-if (count < Number.MAX_SAFE_INTEGER)
-    common_1.config.REPEAT_RUN = count;
-common_1.config.REPEAT_RUN_MEM = Math.min(count, common_1.config.REPEAT_RUN_MEM);
-common_1.config.REPEAT_RUN_STARTUP = Math.min(count, common_1.config.REPEAT_RUN_STARTUP);
-common_1.config.FORK_CHROMEDRIVER = args.fork === 'true';
-let dir = args.check === 'true' ? "results_check" : "results";
-let exitOnError = args.exitOnError === 'true';
-common_1.config.EXIT_ON_ERROR = exitOnError;
-console.log("fork chromedriver process?", common_1.config.FORK_CHROMEDRIVER);
-if (!fs.existsSync(dir))
-    fs.mkdirSync(dir);
-if (args.help) {
-    yargs.showHelp();
+async function main() {
+    let frameworks = await common_1.initializeFrameworks();
+    let runBenchmarks = (args.benchmark && args.benchmark.length > 0 ? args.benchmark : [""]).map(v => v.toString());
+    let runFrameworks = (args.framework && args.framework.length > 0 ? args.framework : [""]).map(v => v.toString());
+    let count = Number(args.count);
+    common_1.config.PORT = Number(args.port);
+    if (count < Number.MAX_SAFE_INTEGER)
+        common_1.config.REPEAT_RUN = count;
+    common_1.config.REPEAT_RUN_MEM = Math.min(count, common_1.config.REPEAT_RUN_MEM);
+    common_1.config.REPEAT_RUN_STARTUP = Math.min(count, common_1.config.REPEAT_RUN_STARTUP);
+    common_1.config.FORK_CHROMEDRIVER = args.fork === 'true';
+    common_1.config.WRITE_RESULTS = !args.noResults;
+    console.log(args, "no-results", args.noResults, common_1.config.WRITE_RESULTS);
+    let dir = args.check === 'true' ? "results_check" : "results";
+    let exitOnError = args.exitOnError === 'true';
+    common_1.config.EXIT_ON_ERROR = exitOnError;
+    console.log("fork chromedriver process?", common_1.config.FORK_CHROMEDRIVER);
+    if (!fs.existsSync(dir))
+        fs.mkdirSync(dir);
+    if (args.help) {
+        yargs.showHelp();
+    }
+    else {
+        runBench(frameworks, runFrameworks, runBenchmarks, dir).then(_ => {
+            console.log("successful run");
+        }).catch(error => {
+            console.log("run was not completely sucessful");
+        });
+    }
 }
-else {
-    runBench(runFrameworks, runBenchmarks, dir).then(_ => {
-        console.log("successful run");
-    }).catch(error => {
-        console.log("run was not completely sucessful");
-    });
-}
+main();
 //# sourceMappingURL=benchmarkRunner.js.map
